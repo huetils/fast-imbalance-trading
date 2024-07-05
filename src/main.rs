@@ -13,7 +13,7 @@ const TRADE_SIZE: f64 = 0.01;
 const SPREAD_THRESHOLD: f64 = 0.01;
 
 // Function to calculate volume order imbalance (VOI)
-fn calculate_voi(_order_book: &OrderBook) -> (f64, f64, f64) {
+fn calculate_voi(order_book: &OrderBook) -> (f64, f64, f64) {
     // let bid_volume: f64 = order_book.bids.levels.iter().map(|bid| bid.amount).sum();
     // let ask_volume: f64 = order_book.asks.levels.iter().map(|ask| ask.amount).sum();
     let bid_volume = 0_f64;
@@ -47,7 +47,7 @@ fn create_limit_buy_order(symbol: &str, trade_size: f64, bid: f64) {
     );
 }
 
-fn fetch_order_book(_symbol: &str) -> OrderBook {
+fn fetch_order_book(symbol: &str) -> OrderBook {
     OrderBook {
         last_update_time: chrono::Utc::now(),
         bids: OrderBookSide::new(
@@ -76,8 +76,10 @@ fn main() {
     loop {
         let order_book: OrderBook = fetch_order_book(symbol);
 
-        let bid: f64 = 0_f64; // price
-        let ask: f64 = 0_f64; // price
+        // let bid: f64 = order_book.bids.levels[0].price;
+        // let ask: f64 = order_book.asks.levels[0].price;
+        let bid = 0_f64;
+        let ask = 0_f64;
         let spread: f64 = (ask - bid) / bid * 100.0;
         let last_price: f64 = (bid + ask) / 2.0;
 
@@ -94,8 +96,7 @@ fn main() {
         if should_trade(spread, voi) {
             // Buy at the bid price if VOI is positive and OIR indicates a strong buy signal
             if voi > 0.0 && oir > 0.1 {
-                // Hypothetical function to create a limit buy order
-                barter_data::create_limit_buy_order(symbol, TRADE_SIZE, bid);
+                create_limit_buy_order(symbol, TRADE_SIZE, bid);
                 positions.push(TRADE_SIZE);
                 cash -= bid * TRADE_SIZE;
                 println!(
@@ -106,11 +107,9 @@ fn main() {
                     Utc::now()
                 );
             }
-
             // Sell at the ask price if VOI is negative and MPB indicates a strong sell signal
             else if voi < 0.0 && mpb < -0.1 && !positions.is_empty() {
-                // Hypothetical function to create a limit sell order
-                barter_data::create_limit_sell_order(symbol, TRADE_SIZE, ask);
+                create_limit_sell_order(symbol, TRADE_SIZE, ask);
                 positions.pop();
                 cash += ask * TRADE_SIZE;
                 println!(
