@@ -1,7 +1,8 @@
-use barter_data::subscription::book::Level;
+use barter_data::exchange::aevo::Aevo;
+use barter_data::streams::Streams;
 use barter_data::subscription::book::OrderBook;
-use barter_data::subscription::book::OrderBookSide;
-use barter_integration::model::Side;
+use barter_data::subscription::book::OrderBooksL2;
+use barter_integration::model::instrument::kind::InstrumentKind;
 use chrono::Utc;
 use std::thread;
 use std::time::Duration;
@@ -14,11 +15,9 @@ const SPREAD_THRESHOLD: f64 = 0.01;
 
 // Function to calculate volume order imbalance (VOI)
 fn calculate_voi(order_book: &OrderBook) -> (f64, f64, f64) {
-    // let bid_volume: f64 = order_book.bids.levels.iter().map(|bid| bid.amount).sum();
-    // let ask_volume: f64 = order_book.asks.levels.iter().map(|ask| ask.amount).sum();
-    let bid_volume = 0_f64;
-    let ask_volume = 0_f64;
-    let voi: f64 = bid_volume - ask_volume;
+    let bid_volume = order_book.bids.levels.iter().map(|bid| bid.amount).sum();
+    let ask_volume = order_book.asks.levels.iter().map(|ask| ask.amount).sum();
+    let voi = bid_volume - ask_volume;
     (voi, bid_volume, ask_volume)
 }
 
@@ -47,39 +46,27 @@ fn create_limit_buy_order(symbol: &str, trade_size: f64, bid: f64) {
     );
 }
 
-fn fetch_order_book(symbol: &str) -> OrderBook {
-    OrderBook {
-        last_update_time: chrono::Utc::now(),
-        bids: OrderBookSide::new(
-            Side::Buy,
-            vec![Level {
-                price: 10000.0,
-                amount: 1.0,
-            }],
-        ),
-        asks: OrderBookSide::new(
-            Side::Sell,
-            vec![Level {
-                price: 10001.0,
-                amount: 1.0,
-            }],
-        ),
-    }
-}
+#[tokio::main]
+async fn main() {
+    init_logging();
 
-fn main() {
     let mut positions: Vec<f64> = Vec::new();
     let mut cash: f64 = 0.0;
     let symbol = "BTC/USDT";
 
-    // Main trading loop
-    loop {
-        let order_book: OrderBook = fetch_order_book(symbol);
+    // TODO: Add order book streams from other exchanges, then merge them
+    let streams = Streams::<OrderBooksL2>::builder()
+        .subscribe([(Aevo, "btc", "usd", InstrumentKind::Perpetual, OrderBooksL2)])
+        .init()
+        .await
+        .unwrap();
 
-        // let bid: f64 = order_book.bids.levels[0].price;
-        // let ask: f64 = order_book.asks.levels[0].price;
-        let bid = 0_f64;
-        let ask = 0_f64;
+    let mut joined_stream = streams.join().await;
+
+    while let Some(market_event) = joined_stream.recv().await {
+        let order_book = market_event.kind;
+        let bid: f64 = order_book.bids.levels[0].price;
+        let ask: f64 = order_book.asks.levels[0].price;
         let spread: f64 = (ask - bid) / bid * 100.0;
         let last_price: f64 = (bid + ask) / 2.0;
 
@@ -129,4 +116,21 @@ fn main() {
         // Sleep before the next iteration
         thread::sleep(Duration::from_secs(1));
     }
+}
+
+// Initialise an INFO `Subscriber` for `Tracing` Json logs and install it as the global default.
+fn init_logging() {
+    tracing_subscriber::fmt()
+        // Filter messages based on the INFO
+        .with_env_filter(
+            tracing_subscriber::filter::EnvFilter::builder()
+                .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        // Disable colours on release builds
+        .with_ansi(cfg!(debug_assertions))
+        // Enable Json formatting
+        .pretty()
+        // Install this Tracing subscriber as global default
+        .init()
 }

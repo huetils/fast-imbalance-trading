@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-barter-data = "0.7.1"
-barter-integration = "0.7.2"
+barter-data = { git = "ssh://git@github.com/huenique/barter-data-rs.git" }
+barter-integration = "0.5.3"
 chrono = "0.4.38"
+tokio = { version = "1.38.0", features = ["full"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
