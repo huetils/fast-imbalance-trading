@@ -6,12 +6,14 @@ use barter_integration::model::instrument::kind::InstrumentKind;
 use chrono::Utc;
 use std::thread;
 use std::time::Duration;
+use tracing::info;
 
 // Example trade size in BTC
 const TRADE_SIZE: f64 = 0.01;
 
 // Spread threshold for making a trade in percentage
-const SPREAD_THRESHOLD: f64 = 0.01;
+// Adjust based on backtesting and performance analysis
+const SPREAD_THRESHOLD: f64 = 0.05;
 
 // Function to calculate volume order imbalance (VOI)
 fn calculate_voi(order_book: &OrderBook) -> (f64, f64, f64) {
@@ -27,7 +29,7 @@ fn should_trade(spread: f64, voi: f64) -> bool {
 }
 
 fn create_limit_sell_order(symbol: &str, trade_size: f64, ask: f64) {
-    println!(
+    info!(
         "Selling {} {} at {} at {}",
         trade_size,
         symbol,
@@ -37,7 +39,7 @@ fn create_limit_sell_order(symbol: &str, trade_size: f64, ask: f64) {
 }
 
 fn create_limit_buy_order(symbol: &str, trade_size: f64, bid: f64) {
-    println!(
+    info!(
         "Buying {} {} at {} at {}",
         trade_size,
         symbol,
@@ -86,7 +88,7 @@ async fn main() {
                 create_limit_buy_order(symbol, TRADE_SIZE, bid);
                 positions.push(TRADE_SIZE);
                 cash -= bid * TRADE_SIZE;
-                println!(
+                info!(
                     "Bought {} {} at {} at {}",
                     TRADE_SIZE,
                     symbol,
@@ -99,7 +101,7 @@ async fn main() {
                 create_limit_sell_order(symbol, TRADE_SIZE, ask);
                 positions.pop();
                 cash += ask * TRADE_SIZE;
-                println!(
+                info!(
                     "Sold {} {} at {} at {}",
                     TRADE_SIZE,
                     symbol,
@@ -110,8 +112,12 @@ async fn main() {
         }
 
         // Calculate the current portfolio value
-        let portfolio_value: f64 = cash + positions.len() as f64 * bid;
-        println!("Current portfolio value: ${:.2}", portfolio_value);
+        let portfolio_value = cash + positions.len() as f64 * bid;
+        info!(
+            "Current portfolio value: ${:.2} at {}",
+            portfolio_value,
+            Utc::now()
+        );
 
         // Sleep before the next iteration
         thread::sleep(Duration::from_secs(1));
